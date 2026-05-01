@@ -21,13 +21,18 @@ def main() -> None:
     """Load configuration, run the graph, and print the result."""
     load_dotenv()
 
-    task = read_user_task()
-    if not task:
+    user_input = read_user_task()
+    if not user_input:
         print("Error: please provide a non-empty task.")
         return
 
-    response = run_graph(task)
-    print(response)
+    result = run_graph(user_input)
+    print("Manager Plan:")
+    print(result["task_breakdown"])
+    print("\nDeveloper Output:")
+    print(result["dev_output"])
+    print("\nFinal Output:")
+    print(result["final_output"])
 
 
 if __name__ == "__main__":

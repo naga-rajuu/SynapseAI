@@ -6,16 +6,19 @@ from core.llm import generate_response
 
 
 class DevAgent:
-    """A minimal agent that turns a task string into a model response."""
+    """Agent responsible for executing a manager-produced plan."""
 
-    def build_prompt(self, task: str) -> str:
+    def build_prompt(self, task_breakdown: str) -> str:
         """Create a prompt for the development agent."""
         return (
-            "You are a helpful software development agent.\n"
-            "Read the task and provide a concise, practical response.\n\n"
-            f"Task: {task}"
+            "You are a developer agent.\n"
+            "Execute the implementation plan and return a concise implementation response.\n"
+            "Use only the plan provided below.\n"
+            "Do not repeat the full plan.\n"
+            "Keep the response short and practical.\n\n"
+            f"Plan:\n{task_breakdown}"
         )
 
-    def run(self, task: str) -> str:
-        """Generate the agent response for a single task."""
-        return generate_response(self.build_prompt(task))
+    def run(self, task_breakdown: str) -> str:
+        """Generate the agent response for a single task breakdown."""
+        return generate_response(self.build_prompt(task_breakdown))

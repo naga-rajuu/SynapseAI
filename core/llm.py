@@ -63,3 +63,8 @@ def generate_response(prompt: str) -> str:
         return generated_text
 
     return "Ollama API error: empty response received from the model."
+
+
+def is_error_response(response: str) -> bool:
+    """Return True when the model call returned a readable error string."""
+    return response.startswith("Ollama API error:")
