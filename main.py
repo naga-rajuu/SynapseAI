@@ -27,10 +27,29 @@ def main() -> None:
         return
 
     result = run_graph(user_input)
-    print("Manager Plan:")
-    print(result["task_breakdown"])
-    print("\nDeveloper Output:")
-    print(result["dev_output"])
+    print(f"Project Status: {result['project_status']}")
+    print("Team Tasks:")
+    for team_name, task in result["team_tasks"].items():
+        if bool(task["needed"]):
+            print(f"{team_name.title()} Team: {task['task']}")
+
+    print("\nLead Status:")
+    for team_name, status in result["lead_statuses"].items():
+        print(f"{status['name']}: {status['status']}")
+
+    print("\nWorker Status:")
+    for team_name, workers in result["worker_statuses"].items():
+        for worker_name, worker_status in workers.items():
+            print(f"{worker_name}: {worker_status['status']}")
+
+    print("\nLead Outputs:")
+    for item in sorted(result["lead_outputs"], key=lambda value: value["team"]):
+        print(f"{item['lead']}:")
+        print(item["output"])
+        print()
+
+    print("Merged Output:")
+    print(result["merged_output"])
     print("\nFinal Output:")
     print(result["final_output"])
 
