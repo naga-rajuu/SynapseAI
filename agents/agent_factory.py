@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,17 @@ class AgentSpec:
     role: str
     seniority: str
     focus: str
+    model: str | None = None
+
+    @property
+    def key(self) -> str:
+        """Return a stable identifier for graph routing and state."""
+        return slugify(self.name)
+
+    @property
+    def node_name(self) -> str:
+        """Return the LangGraph node name for this agent."""
+        return f"{self.key}_node"
 
 
 TEAM_ORDER = ["backend", "frontend", "qa", "devops"]
@@ -166,6 +178,35 @@ def get_worker_specs(team: str) -> list[AgentSpec]:
     return list(TEAM_STRUCTURE[team]["workers"])  # type: ignore[return-value]
 
 
+def get_all_worker_specs() -> list[AgentSpec]:
+    """Return every worker spec across all teams."""
+    all_workers: list[AgentSpec] = []
+    for team in get_team_names():
+        all_workers.extend(get_worker_specs(team))
+    return all_workers
+
+
+def get_worker_spec_by_key(worker_key: str) -> AgentSpec:
+    """Return the worker spec for a stable worker key."""
+    for worker in get_all_worker_specs():
+        if worker.key == worker_key:
+            return worker
+    raise KeyError(f"Unknown worker key: {worker_key}")
+
+
+def get_team_worker_keys(team: str) -> list[str]:
+    """Return the worker keys for a team in the configured order."""
+    return [worker.key for worker in get_worker_specs(team)]
+
+
+def build_worker_model_map() -> dict[str, str]:
+    """Build the default per-worker model map."""
+    return {
+        worker.key: (worker.model or "")
+        for worker in get_all_worker_specs()
+    }
+
+
 def build_initial_lead_statuses() -> dict[str, dict[str, str]]:
     """Build the default status map for every lead."""
     return {
@@ -178,15 +219,20 @@ def build_initial_lead_statuses() -> dict[str, dict[str, str]]:
     }
 
 
-def build_initial_worker_statuses() -> dict[str, dict[str, dict[str, str]]]:
+def build_initial_worker_statuses() -> dict[str, dict[str, str]]:
     """Build the default status map for every worker."""
     return {
-        team: {
-            worker.name: {
-                "status": "pending",
-                "subtask": "",
-            }
-            for worker in get_worker_specs(team)
+        worker.key: {
+            "name": worker.name,
+            "team": worker.team,
+            "status": "pending",
+            "subtask": "",
         }
-        for team in get_team_names()
+        for worker in get_all_worker_specs()
     }
+
+
+def slugify(value: str) -> str:
+    """Return a simple slug used for keys and graph node names."""
+    normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    return normalized or "agent"

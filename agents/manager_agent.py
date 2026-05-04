@@ -22,6 +22,10 @@ class ManagerAgent:
         )
 
     def run(self, project_request: str) -> dict[str, dict[str, object]] | str:
+        heuristic_tasks = self.infer_team_tasks_from_request(project_request)
+        if heuristic_tasks is not None:
+            return heuristic_tasks
+
         raw_response = generate_response(self.build_prompt(project_request))
         if is_error_response(raw_response):
             return raw_response
@@ -67,3 +71,34 @@ class ManagerAgent:
                 "task": f"Prepare deployment, CI/CD, and runtime setup for {project_request}.",
             },
         }
+
+    def infer_team_tasks_from_request(
+        self,
+        project_request: str,
+    ) -> dict[str, dict[str, object]] | None:
+        """Use simple intent heuristics when the request clearly targets one team."""
+        normalized = project_request.lower()
+        wants_frontend = any(token in normalized for token in {"ui", "frontend", "page", "screen", "component"})
+        wants_backend = any(token in normalized for token in {"api", "backend", "database", "auth"})
+        wants_qa = any(token in normalized for token in {"test", "qa", "bug", "verify"})
+        wants_devops = any(token in normalized for token in {"docker", "deploy", "devops", "ci", "pipeline"})
+        only_frontend = "only ui" in normalized or "only frontend" in normalized
+        only_backend = "only backend" in normalized or "only api" in normalized
+
+        if only_frontend or (wants_frontend and not wants_backend and not wants_qa and not wants_devops):
+            return {
+                "backend": {"needed": False, "task": ""},
+                "frontend": {"needed": True, "task": "frontend development"},
+                "qa": {"needed": False, "task": ""},
+                "devops": {"needed": False, "task": ""},
+            }
+
+        if only_backend or (wants_backend and not wants_frontend and not wants_qa and not wants_devops):
+            return {
+                "backend": {"needed": True, "task": "backend implementation"},
+                "frontend": {"needed": False, "task": ""},
+                "qa": {"needed": False, "task": ""},
+                "devops": {"needed": False, "task": ""},
+            }
+
+        return None

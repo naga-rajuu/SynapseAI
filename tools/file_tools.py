@@ -23,6 +23,46 @@ def write_file(path: str, content: str) -> str:
     return f"File written: {target_path.relative_to(PROJECT_ROOT)}"
 
 
+def edit_file(path: str, old_text: str, new_text: str) -> str:
+    """Replace text content in a file inside the project workspace."""
+    target_path = resolve_safe_path(path)
+    if not target_path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    original = target_path.read_text(encoding="utf-8")
+    if old_text not in original:
+        raise ValueError("Target text not found in file.")
+    updated = original.replace(old_text, new_text, 1)
+    target_path.write_text(updated, encoding="utf-8")
+    return f"File edited: {target_path.relative_to(PROJECT_ROOT)}"
+
+
+def append_file(path: str, content: str) -> str:
+    """Append text content to a file inside the project workspace."""
+    target_path = resolve_safe_path(path)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with target_path.open("a", encoding="utf-8") as handle:
+        handle.write(content)
+    return f"File appended: {target_path.relative_to(PROJECT_ROOT)}"
+
+
+def create_folder(path: str) -> str:
+    """Create a folder inside the project workspace."""
+    target_path = resolve_safe_path(path)
+    target_path.mkdir(parents=True, exist_ok=True)
+    return f"Folder created: {target_path.relative_to(PROJECT_ROOT)}"
+
+
+def delete_file(path: str) -> str:
+    """Delete a file inside the project workspace."""
+    target_path = resolve_safe_path(path)
+    if not target_path.exists():
+        raise FileNotFoundError(f"File not found: {path}")
+    if target_path.is_dir():
+        raise ValueError("delete_file only supports files.")
+    target_path.unlink()
+    return f"File deleted: {target_path.relative_to(PROJECT_ROOT)}"
+
+
 def read_file(path: str) -> str:
     """Read text content from a file inside the project workspace."""
     target_path = resolve_safe_path(path)

@@ -30,23 +30,23 @@ def get_ollama_timeout_seconds() -> int:
         return DEFAULT_OLLAMA_TIMEOUT_SECONDS
 
 
-def build_payload(prompt: str) -> dict[str, object]:
+def build_payload(prompt: str, model: str | None = None) -> dict[str, object]:
     """Build the Ollama request payload for a prompt."""
     return {
-        "model": get_ollama_model(),
+        "model": (model or get_ollama_model()).strip(),
         "prompt": prompt,
         "stream": False,
     }
 
 
-def generate_response(prompt: str) -> str:
+def generate_response(prompt: str, model: str | None = None) -> str:
     """Send a prompt to Ollama and return the generated response."""
     endpoint = f"{get_ollama_base_url().rstrip('/')}/api/generate"
 
     try:
         response = requests.post(
             endpoint,
-            json=build_payload(prompt),
+            json=build_payload(prompt, model=model),
             timeout=get_ollama_timeout_seconds(),
         )
         response.raise_for_status()

@@ -6,6 +6,8 @@ import sys
 
 from dotenv import load_dotenv
 
+from agents.agent_factory import get_team_names
+from agents.agent_factory import get_team_worker_keys
 from orchestrator.graph import run_graph
 
 
@@ -38,9 +40,38 @@ def main() -> None:
         print(f"{status['name']}: {status['status']}")
 
     print("\nWorker Status:")
-    for team_name, workers in result["worker_statuses"].items():
-        for worker_name, worker_status in workers.items():
-            print(f"{worker_name}: {worker_status['status']}")
+    for team_name in get_team_names():
+        for worker_key in get_team_worker_keys(team_name):
+            worker_status = result["worker_statuses"][worker_key]
+            line = f"{worker_status['name']}: {worker_status['status']}"
+            if worker_status["subtask"]:
+                line += f" | {worker_status['subtask']}"
+            print(line)
+
+    print("\nIdle Workers:")
+    for team_name, workers in result["idle_workers"].items():
+        if workers:
+            print(f"{team_name.title()}: {', '.join(workers)}")
+
+    print("\nReview Comments:")
+    pending_comments = False
+    for worker_key, review in result["review_comments"].items():
+        if review["comments"]:
+            pending_comments = True
+            worker_name = result["worker_statuses"][worker_key]["name"]
+            print(f"{worker_name}: {'; '.join(review['comments'])}")
+    if not pending_comments:
+        print("None")
+
+    print("\nTool Calls:")
+    if result["tool_call_records"]:
+        for record in result["tool_call_records"]:
+            print(f"{record['worker']}:")
+            for tool_call in record["tool_calls"]:
+                status = "success" if bool(tool_call["success"]) else "failed"
+                print(f"  - {tool_call['tool']}: {status}")
+    else:
+        print("None")
 
     print("\nLead Outputs:")
     for item in sorted(result["lead_outputs"], key=lambda value: value["team"]):
@@ -52,6 +83,7 @@ def main() -> None:
     print(result["merged_output"])
     print("\nFinal Output:")
     print(result["final_output"])
+    print(f"\nAudit Log: {result['audit_log_path']}")
 
 
 if __name__ == "__main__":
