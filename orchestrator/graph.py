@@ -190,6 +190,9 @@ def make_worker_node(worker_key: str):
         review_info = state["review_comments"].get(worker_key, {})
         review_comments = review_info.get("comments", []) if isinstance(review_info, dict) else []
         model = state["worker_model_map"].get(worker_key) or None
+        previous_output = ""
+        if worker_key in state["worker_outputs"]:
+            previous_output = str(state["worker_outputs"][worker_key].get("output", ""))
         result = worker_agent.execute(
             project_request=state["project_request"],
             team_task=str(state["team_tasks"][worker_spec.team]["task"]),
@@ -199,6 +202,7 @@ def make_worker_node(worker_key: str):
             approval_manager=TerminalApprovalManager(),
             model=model,
             review_comments=list(review_comments) if isinstance(review_comments, list) else None,
+            previous_output=previous_output,
         )
         return {
             "worker_statuses": {
