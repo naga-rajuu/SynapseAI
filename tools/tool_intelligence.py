@@ -1,4 +1,4 @@
-"""Helpers for inferring tool requests from worker-local subtasks."""
+"""Helpers for inferring tool requests from branch-based worker subtasks."""
 
 from __future__ import annotations
 
@@ -16,28 +16,28 @@ def infer_tool_requests(
     team_task: str,
     subtask: str,
     allowed_tools: list[str],
-    assigned_files: list[str] | None = None,
-    all_team_files: list[str] | None = None,
-    setup_folders: list[str] | None = None,
+    team: str,
+    active_project: str,
+    request_type: str,
 ) -> list[dict[str, Any]]:
-    """Infer a small set of tool requests for a local subtask."""
-    assigned_requests = infer_assignment_requests(
+    """Infer a small set of tool requests for a worker branch."""
+    deterministic = infer_branch_requests(
         project_request=project_request,
         team_task=team_task,
         subtask=subtask,
-        assigned_files=assigned_files or [],
-        all_team_files=all_team_files or assigned_files or [],
-        setup_folders=setup_folders or [],
+        team=team,
+        active_project=active_project,
+        request_type=request_type,
     )
-    if assigned_requests:
-        return [item for item in assigned_requests if item["tool"] in allowed_tools][:4]
+    if deterministic:
+        return [item for item in deterministic if item["tool"] in allowed_tools][:4]
 
     heuristic_requests = infer_with_heuristics(subtask)
     if heuristic_requests:
         return [item for item in heuristic_requests if item["tool"] in allowed_tools][:4]
 
     raw_response = generate_response(
-        build_tool_prompt(project_request, team_task, subtask, allowed_tools)
+        build_tool_prompt(project_request, team_task, subtask, allowed_tools, team)
     )
     if is_error_response(raw_response):
         return []
@@ -45,9 +45,6 @@ def infer_tool_requests(
     try:
         data = json.loads(raw_response)
     except json.JSONDecodeError:
-        return []
-
-    if not isinstance(data, list):
         return []
 
     tool_requests: list[dict[str, Any]] = []
@@ -66,15 +63,17 @@ def build_tool_prompt(
     team_task: str,
     subtask: str,
     allowed_tools: list[str],
+    team: str,
 ) -> str:
     """Create a minimal tool-planning prompt."""
     tool_list = ", ".join(allowed_tools)
     return (
-        "Choose deterministic tool calls for the local subtask.\n"
+        "Choose deterministic repository tool calls for this software engineering subtask.\n"
         "Return only a JSON array.\n"
         "Each item must have keys: tool and params.\n"
         "Use at most 2 tool calls.\n"
         "If no tool is needed, return [].\n\n"
+        f"Team: {team}\n"
         f"Allowed tools: {tool_list}\n"
         f"Project request: {project_request}\n"
         f"Team task: {team_task}\n"
@@ -82,23 +81,28 @@ def build_tool_prompt(
     )
 
 
-def infer_assignment_requests(
+def infer_branch_requests(
     project_request: str,
     team_task: str,
     subtask: str,
-    assigned_files: list[str],
-    all_team_files: list[str],
-    setup_folders: list[str],
+    team: str,
+    active_project: str,
+    request_type: str,
 ) -> list[dict[str, Any]]:
-    """Generate tool calls directly from planned file ownership."""
-    if not assigned_files:
-        return []
-
+    """Generate repository writes from the subtask without lead-provided filenames."""
+    paths = derive_target_paths(team=team, subtask=subtask, active_project=active_project, request_type=request_type)
     requests: list[dict[str, Any]] = []
-    for directory in setup_folders:
-        requests.append({"tool": "create_folder", "params": {"path": directory}})
+    folders = sorted(
+        {
+            str(PurePosixPath(path).parent)
+            for path in paths
+            if str(PurePosixPath(path).parent) not in {"", "."}
+        }
+    )
+    for folder in folders:
+        requests.append({"tool": "create_folder", "params": {"path": folder}})
 
-    for path in assigned_files:
+    for path in paths:
         requests.append(
             {
                 "tool": "write_file",
@@ -109,13 +113,59 @@ def infer_assignment_requests(
                         team_task=team_task,
                         subtask=subtask,
                         path=path,
-                        all_team_files=all_team_files,
                     ),
                 },
             }
         )
-
     return requests[:4]
+
+
+def derive_target_paths(
+    team: str,
+    subtask: str,
+    active_project: str,
+    request_type: str,
+) -> list[str]:
+    """Derive likely target paths from the team and subtask scope."""
+    normalized = subtask.lower()
+    project_key = active_project.replace("-", "_") or "project"
+    if request_type == "MODIFY_PROJECT":
+        if team == "frontend":
+            if "style" in normalized or "theme" in normalized:
+                return ["generated_apps/repo_updates/frontend_changes.md"]
+            return ["generated_apps/repo_updates/frontend_task.md"]
+        if team == "backend":
+            return ["generated_apps/repo_updates/backend_task.md"]
+        if team == "qa":
+            return ["generated_apps/repo_updates/qa_validation.md"]
+        return ["generated_apps/repo_updates/devops_task.md"]
+
+    if team == "frontend":
+        if "style" in normalized or "responsive" in normalized or "visual" in normalized:
+            return [f"generated_apps/{project_key}/styles.css"]
+        if "document" in normalized or "usage" in normalized:
+            return [f"generated_apps/{project_key}/README.md"]
+        if "state" in normalized or "logic" in normalized or "interaction" in normalized:
+            return [f"generated_apps/{project_key}/app.js"]
+        return [f"generated_apps/{project_key}/index.html"]
+
+    if team == "backend":
+        if "schema" in normalized or "contract" in normalized:
+            return [f"generated_apps/{project_key}_backend/schemas.py"]
+        if "service" in normalized or "business" in normalized:
+            return [f"generated_apps/{project_key}_backend/services.py"]
+        if "document" in normalized or "readme" in normalized:
+            return [f"generated_apps/{project_key}_backend/README.md"]
+        return [f"generated_apps/{project_key}_backend/app.py"]
+
+    if team == "qa":
+        if "automation" in normalized or "smoke" in normalized or "regression" in normalized:
+            return [f"generated_apps/{project_key}_qa/smoke_checklist.md"]
+        return [f"generated_apps/{project_key}_qa/qa_strategy.md"]
+
+    if "pipeline" in normalized or "release" in normalized:
+        return [f"generated_apps/{project_key}_ops/ci.yml"]
+    return [f"generated_apps/{project_key}_ops/Dockerfile"]
 
 
 def infer_with_heuristics(subtask: str) -> list[dict[str, Any]]:
@@ -126,7 +176,7 @@ def infer_with_heuristics(subtask: str) -> list[dict[str, Any]]:
     if "test" in normalized or "pytest" in normalized:
         return [{"tool": "run_pytest", "params": {"target": "."}}]
 
-    if any(word in normalized for word in ("search", "find", "locate", "review")):
+    if any(word in normalized for word in ("search", "find", "locate", "review", "inspect")):
         keyword = extract_keyword(subtask)
         return [{"tool": "search_code", "params": {"query": keyword, "directory": "."}}]
 
@@ -144,12 +194,6 @@ def infer_with_heuristics(subtask: str) -> list[dict[str, Any]]:
     if "dependency" in normalized or "package" in normalized:
         return [{"tool": "dependency_lookup", "params": {"name": extract_keyword(subtask)}}]
 
-    if "delete" in normalized and file_match:
-        return [{"tool": "delete_file", "params": {"path": file_match.group(1)}}]
-
-    if "append" in normalized and file_match:
-        return [{"tool": "append_file", "params": {"path": file_match.group(1), "content": "\n"}}]
-
     return []
 
 
@@ -161,7 +205,7 @@ def extract_keyword(subtask: str) -> str:
     meaningful = [
         word
         for word in words
-        if word.lower() not in {"find", "search", "review", "the", "for", "and"}
+        if word.lower() not in {"find", "search", "review", "the", "for", "and", "inspect"}
     ]
     return meaningful[-1] if meaningful else words[-1]
 
@@ -179,7 +223,7 @@ def infer_file_content(subtask: str, path: str) -> str:
 
 
 def infer_app_name(project_request: str) -> str:
-    """Create a simple folder-safe application name."""
+    """Backward-compatible application naming helper."""
     words = re.findall(r"[A-Za-z0-9]+", project_request.lower())
     filtered = [
         word
@@ -195,17 +239,13 @@ def build_file_content(
     team_task: str,
     subtask: str,
     path: str,
-    all_team_files: list[str],
 ) -> str:
     """Build deterministic content for an assigned file."""
     normalized = path.replace("\\", "/")
-    siblings = {PurePosixPath(item).name for item in all_team_files}
     request_lower = project_request.lower()
 
     if normalized.endswith("index.html"):
-        include_css = "styles.css" in siblings
-        include_js = "app.js" in siblings
-        return build_frontend_html(project_request, include_css=include_css, include_js=include_js)
+        return build_frontend_html(project_request)
     if normalized.endswith("styles.css"):
         return build_frontend_styles(project_request)
     if normalized.endswith("app.js"):
@@ -224,14 +264,12 @@ def build_file_content(
         return "name: generated\n"
     if normalized.endswith("Dockerfile"):
         return "FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nCMD [\"python\", \"main.py\"]\n"
+    if "calculator" in request_lower:
+        return "Generated calculator project artifact.\n"
     return infer_file_content(subtask, path)
 
 
-def build_frontend_html(
-    project_request: str,
-    include_css: bool,
-    include_js: bool,
-) -> str:
+def build_frontend_html(project_request: str) -> str:
     """Build a minimal standalone HTML UI."""
     request_lower = project_request.lower()
     title = "Generated UI"
@@ -268,11 +306,6 @@ def build_frontend_html(
   </section>
 </main>"""
 
-    style_link = '  <link rel="stylesheet" href="./styles.css" />\n' if include_css else ""
-    script_tag = '  <script src="./app.js"></script>\n' if include_js else ""
-    inline_style = "" if include_css else "  <style>body{font-family:Arial,sans-serif;margin:2rem;}</style>\n"
-    inline_script = "" if include_js else "  <script>console.log('Generated UI ready');</script>\n"
-
     return (
         "<!DOCTYPE html>\n"
         '<html lang="en">\n'
@@ -280,13 +313,11 @@ def build_frontend_html(
         '  <meta charset="UTF-8" />\n'
         '  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n'
         f"  <title>{title}</title>\n"
-        f"{style_link}"
-        f"{inline_style}"
+        '  <link rel="stylesheet" href="./styles.css" />\n'
         "</head>\n"
         "<body>\n"
         f"{body}\n"
-        f"{script_tag}"
-        f"{inline_script}"
+        '  <script src="./app.js"></script>\n'
         "</body>\n"
         "</html>\n"
     )
@@ -468,7 +499,7 @@ def build_backend_schemas(project_request: str) -> str:
 def build_readme(project_request: str, team_task: str, subtask: str) -> str:
     """Build a concise markdown note."""
     return (
-        f"# Generated Artifact\n\n"
+        "# Generated Artifact\n\n"
         f"- Project request: {project_request}\n"
         f"- Team task: {team_task}\n"
         f"- Worker focus: {subtask}\n"

@@ -11,8 +11,24 @@ class WorkflowState(TypedDict, total=False):
     """State shared across the LangGraph workflow."""
 
     project_request: str
-    team_tasks: dict[str, dict[str, object]]
+    request_type: str
+    execution_mode: str
+    active_project: str
     project_status: str
+    repo_mode: str
+    github_username: str
+    repo_name: str
+    repo_visibility: str
+    branch_policy: str
+    token_ready: bool
+    repo_ready: bool
+    validation_errors: list[str]
+    missing_fields: list[str]
+    gathered_requirements: Annotated[dict[str, str], operator.or_]
+    execution_context: Annotated[dict[str, object], operator.or_]
+    team_tasks: dict[str, dict[str, object]]
+    repo_plan: dict[str, object]
+    repo_status: Annotated[dict[str, object], operator.or_]
     worker_model_map: dict[str, str]
     lead_statuses: Annotated[dict[str, dict[str, str]], operator.or_]
     worker_statuses: Annotated[dict[str, dict[str, str]], operator.or_]
@@ -31,8 +47,7 @@ class WorkflowState(TypedDict, total=False):
     tool_call_records: Annotated[list[dict[str, object]], operator.add]
     worker_outputs: Annotated[dict[str, dict[str, object]], operator.or_]
     lead_outputs: Annotated[list[dict[str, str]], operator.add]
+    analyst_answers: Annotated[list[dict[str, object]], operator.add]
     audit_log_path: str
     merged_output: str
     final_output: str
-    active_team: str
-    active_worker: str

@@ -18,7 +18,7 @@ WRITE_FILE_TOOLS = {"write_file", "append_file", "create_folder"}
 EDIT_FILE_TOOLS = {"edit_file"}
 DELETE_FILE_TOOLS = {"delete_file"}
 SAFE_GIT_TOOLS = {"git_status", "git_branch", "git_diff", "git_log"}
-RISKY_GIT_TOOLS = {"git_checkout", "git_add", "git_commit", "git_push"}
+RISKY_GIT_TOOLS = {"git_checkout", "git_create_branch", "git_add", "git_commit", "git_pull", "git_push", "git_merge"}
 SAFE_SHELL_TOOLS = {"run_tests", "run_pytest", "build_project"}
 RISKY_SHELL_TOOLS = {"install_packages", "start_server", "stop_process", "run_command"}
 
@@ -51,18 +51,21 @@ def get_allowed_tools(context: ToolExecutionContext) -> set[str]:
     if context.role == "lead":
         return READ_FILE_TOOLS | WRITE_FILE_TOOLS | EDIT_FILE_TOOLS | SAFE_GIT_TOOLS | RISKY_GIT_TOOLS | SAFE_SHELL_TOOLS
 
+    if context.role == "worker":
+        return READ_FILE_TOOLS | WRITE_FILE_TOOLS | EDIT_FILE_TOOLS | SAFE_GIT_TOOLS | RISKY_GIT_TOOLS | SAFE_SHELL_TOOLS
+
     if context.team == "qa":
-        return READ_FILE_TOOLS | SAFE_SHELL_TOOLS
+        return READ_FILE_TOOLS | SAFE_SHELL_TOOLS | SAFE_GIT_TOOLS | RISKY_GIT_TOOLS
 
     if context.seniority == "senior":
-        return READ_FILE_TOOLS | WRITE_FILE_TOOLS | EDIT_FILE_TOOLS | SAFE_SHELL_TOOLS
+        return READ_FILE_TOOLS | WRITE_FILE_TOOLS | EDIT_FILE_TOOLS | SAFE_GIT_TOOLS | RISKY_GIT_TOOLS | SAFE_SHELL_TOOLS
 
-    return READ_FILE_TOOLS | WRITE_FILE_TOOLS
+    return READ_FILE_TOOLS | WRITE_FILE_TOOLS | SAFE_GIT_TOOLS | RISKY_GIT_TOOLS
 
 
 def requires_approval(tool_name: str, params: dict[str, object]) -> str | None:
     """Return the approval reason for risky actions, otherwise None."""
-    if tool_name in {"git_commit", "git_push"}:
+    if tool_name in {"git_commit", "git_push", "git_merge"}:
         return f"{tool_name} changes repository history"
 
     if tool_name == "git_checkout":

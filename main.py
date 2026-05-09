@@ -29,7 +29,22 @@ def main() -> None:
         return
 
     result = run_graph(user_input)
+    print(f"Request Type: {result.get('request_type', '')}")
+    if result.get("execution_mode"):
+        print(f"Execution Mode: {result['execution_mode']}")
     print(f"Project Status: {result['project_status']}")
+    if result.get("repo_name"):
+        print(f"Repo: {result['github_username']}/{result['repo_name']} ({result['repo_visibility']})")
+    if result.get("repo_ready") is not None:
+        print(f"Repo Ready: {result.get('repo_ready')}")
+    if result.get("validation_errors"):
+        print("Validation Errors:")
+        for item in result["validation_errors"]:
+            print(f"- {item}")
+    if result.get("missing_fields"):
+        print("Missing Fields:")
+        for item in result["missing_fields"]:
+            print(f"- {item}")
     print("Team Tasks:")
     for team_name, task in result["team_tasks"].items():
         if bool(task["needed"]):
@@ -78,6 +93,11 @@ def main() -> None:
         print(f"{item['lead']}:")
         print(item["output"])
         print()
+
+    if result.get("analyst_answers"):
+        print("\nAnalyst Answers:")
+        for answer in result["analyst_answers"]:
+            print(answer["answer"])
 
     print("Merged Output:")
     print(result["merged_output"])

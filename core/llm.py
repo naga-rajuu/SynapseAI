@@ -21,7 +21,7 @@ import requests
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "llama3"
 DEFAULT_OLLAMA_TIMEOUT_SECONDS = 180
-LLMRole = Literal["manager", "lead", "worker", "review", "integration"]
+LLMRole = Literal["router", "manager", "lead", "worker", "review", "analyst", "integration"]
 T = TypeVar("T")
 
 

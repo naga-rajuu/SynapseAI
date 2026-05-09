@@ -22,10 +22,13 @@ from tools.file_tools import read_file
 from tools.file_tools import write_file
 from tools.git_tools import git_add
 from tools.git_tools import git_branch
+from tools.git_tools import git_create_branch
 from tools.git_tools import git_checkout
 from tools.git_tools import git_commit
 from tools.git_tools import git_diff
 from tools.git_tools import git_log
+from tools.git_tools import git_merge
+from tools.git_tools import git_pull
 from tools.git_tools import git_push
 from tools.git_tools import git_status
 from tools.permissions import get_allowed_tools
@@ -105,6 +108,13 @@ def _handle_git_checkout(params: dict[str, Any]) -> Any:
     return git_checkout(branch=str(params["branch"]))
 
 
+def _handle_git_create_branch(params: dict[str, Any]) -> Any:
+    return git_create_branch(
+        branch=str(params["branch"]),
+        from_branch=str(params.get("from_branch", "main")),
+    )
+
+
 def _handle_git_add(params: dict[str, Any]) -> Any:
     paths = params.get("paths")
     return git_add(paths=list(paths) if isinstance(paths, list) else None)
@@ -124,6 +134,17 @@ def _handle_git_push(params: dict[str, Any]) -> Any:
         remote=str(params.get("remote", "origin")),
         branch=str(params.get("branch", "main")),
     )
+
+
+def _handle_git_pull(params: dict[str, Any]) -> Any:
+    return git_pull(
+        remote=str(params.get("remote", "origin")),
+        branch=str(params.get("branch", "main")),
+    )
+
+
+def _handle_git_merge(params: dict[str, Any]) -> Any:
+    return git_merge(branch=str(params["branch"]))
 
 
 def _handle_git_log(params: dict[str, Any]) -> Any:
@@ -182,10 +203,13 @@ TOOL_REGISTRY: dict[str, ToolHandler] = {
     "git_status": _handle_git_status,
     "git_branch": _handle_git_branch,
     "git_checkout": _handle_git_checkout,
+    "git_create_branch": _handle_git_create_branch,
     "git_add": _handle_git_add,
     "git_commit": _handle_git_commit,
     "git_diff": _handle_git_diff,
+    "git_pull": _handle_git_pull,
     "git_push": _handle_git_push,
+    "git_merge": _handle_git_merge,
     "git_log": _handle_git_log,
     "run_tests": _handle_run_tests,
     "run_pytest": _handle_run_pytest,

@@ -41,6 +41,9 @@ def validate_file_access(
     if not target:
         return f"{tool_name} requires a path."
 
+    if not normalized_assigned:
+        return None
+
     if tool_name == "create_folder":
         if any(path == target or path.startswith(f"{target}/") for path in normalized_assigned):
             return None
